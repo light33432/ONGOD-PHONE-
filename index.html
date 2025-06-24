@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel - ONGOD PHONE GADGET</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: 'Inter', Arial, sans-serif; background: #f4f6fa; margin: 0; }
+    .sidebar { width: 220px; background: linear-gradient(135deg, #1a237e 60%, #3949ab 100%); color: #fff; min-height: 100vh; float: left; }
+    .sidebar-header { padding: 32px 0 24px 0; text-align: center; font-size: 1.3rem; font-weight: 700; letter-spacing: 1px; background: rgba(255,255,255,0.05);}
+    .sidebar-nav { display: flex; flex-direction: column; gap: 8px; padding: 0 0 24px 0;}
+    .sidebar-nav a { color: #fff; text-decoration: none; padding: 14px 32px; font-size: 1.08rem; border-left: 4px solid transparent; transition: background 0.15s, border-color 0.15s; display: block;}
+    .sidebar-nav a.active, .sidebar-nav a:hover { background: rgba(255,255,255,0.08); border-left: 4px solid #fff;}
+    .sidebar-footer { padding: 18px 0; text-align: center; font-size: 0.98rem; background: rgba(255,255,255,0.04); color: #b3b8e0;}
+    .main-content { margin-left: 220px; padding: 38px 48px; min-height: 100vh;}
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(26,35,126,0.08); padding: 28px 22px; margin-bottom: 28px;}
+    table { width: 100%; border-collapse: collapse; margin-top: 10px;}
+    th, td { border: 1px solid #e0e0e0; padding: 8px 10px; text-align: left;}
+    th { background: #f4f6fa; color: #1a237e;}
+    img { max-height: 40px; }
+    select, button, input[type="number"] { padding: 4px 8px; }
+    input[type="number"] { width: 110px; }
+    @media (max-width: 800px) {
+      .sidebar { width: 60px; }
+      .sidebar-header, .sidebar-footer { display: none; }
+      .sidebar-nav a { padding: 14px 10px; font-size: 1.1rem; text-align: center; }
+      .main-content { margin-left: 60px; padding: 18px 8px; }
+    }
+    .danger-btn {
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 18px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      transition: background 0.2s;
+    }
+    .danger-btn:hover {
+      background: #c0392b;
+    }
+  </style>
+</head>
+<body>
+  <nav class="sidebar">
+    <div class="sidebar-header">Admin Panel</div>
+    <div class="sidebar-nav">
+      <a href="#" class="active" onclick="showSection('dashboard')">Dashboard</a>
+      <a href="#" onclick="showSection('products')">Products</a>
+      <a href="#" onclick="showSection('orders')">Orders</a>
+      <a href="#" onclick="showSection('users')">Users</a>
+      <a href="#" onclick="showSection('notifications')">Notifications</a>
+    </div>
+    <div class="sidebar-footer">&copy; 2025 ONGOD GADGETS</div>
+  </nav>
+  <main class="main-content">
+    <div id="dashboard-section" class="card">
+      <h1>Welcome, Admin!</h1>
+      <p>Use the sidebar to manage products, orders, users, and notifications.</p>
+      <button class="danger-btn" onclick="deleteAllUsers()">Delete All Users (Force Re-Registration)</button>
+      <div id="delete-users-result" style="color:#e74c3c;font-weight:bold;margin-top:10px;"></div>
+    </div>
+    <div id="products-section" class="card" style="display:none;"></div>
+    <div id="orders-section" class="card" style="display:none;"></div>
+    <div id="users-section" class="card" style="display:none;"></div>
+    <div id="notifications-section" class="card" style="display:none;"></div>
+  </main>
+  <script>
+    // Backend API base URL
+    const API = "https://ongod-phone-gadget-1.onrender.com/api";
+    function showSection(section) {
+      document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+      document.querySelectorAll('.main-content > div').forEach(div => div.style.display = 'none');
+      document.getElementById(section + '-section').style.display = 'block';
+      document.querySelectorAll('.sidebar-nav a').forEach(link => {
+        if (link.textContent.toLowerCase().includes(section)) link.classList.add('active');
+      });
+      if (section === 'products') loadProducts();
+      if (section === 'orders') loadOrders();
+      if (section === 'users') loadUsers();
+      if (section === 'notifications') loadNotifications();
+    }
+
+    async function loadProducts() {
+      const res = await fetch(API + '/products');
+      const products = await res.json();
+      let html = `<h1>Products</h1>
+        <table>
+          <tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Image</th><th>Action</th></tr>`;
+      for (const p of products) {
+        html += `<tr>
+          <td>${p.id}</td>
+          <td>${p.name}</td>
+          <td>${p.category}</td>
+          <td>
+            <input type="number" id="price-${p.id}" value="${p.price}" min="0" />
+          </td>
+          <td><img src="${p.image}" alt="" /></td>
+          <td>
+            <button onclick="saveProductPrice(${p.id})">Save</button>
+          </td>
+        </tr>`;
+      }
+      html += `</table>`;
+      document.getElementById('products-section').innerHTML = html;
+    }
+
+    async function saveProductPrice(productId) {
+      const priceInput = document.getElementById(`price-${productId}`);
+      const newPrice = parseInt(priceInput.value, 10);
+      if (isNaN(newPrice) || newPrice < 0) {
+        alert('Please enter a valid price.');
+        return;
+      }
+      await fetch(API + `/products/${productId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ price: newPrice })
+      });
+      alert('Price updated!');
+      loadProducts();
+    }
+
+    async function loadOrders() {
+      const res = await fetch(API + '/orders');
+      const orders = await res.json();
+      let html = `<h1>Orders</h1>
+        <table>
+          <tr><th>ID</th><th>User</th><th>Product</th><th>Price</th><th>Status</th><th>Action</th></tr>`;
+      for (const o of orders) {
+        html += `<tr>
+          <td>${o.id}</td>
+          <td>${o.username || ''}</td>
+          <td>${o.product || ''}</td>
+          <td>₦${o.price ? o.price.toLocaleString() : ''}</td>
+          <td>
+            <select id="status-${o.id}">
+              <option value="pending" ${o.status === 'pending' ? 'selected' : ''}>Pending</option>
+              <option value="processing" ${o.status === 'processing' ? 'selected' : ''}>Processing</option>
+              <option value="confirmed" ${o.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+              <option value="rejected" ${o.status === 'rejected' ? 'selected' : ''}>Rejected</option>
+            </select>
+          </td>
+          <td>
+            <button onclick="updateOrderStatus(${o.id}, '${o.username || ''}')">Update</button>
+          </td>
+        </tr>`;
+      }
+      html += `</table>`;
+      document.getElementById('orders-section').innerHTML = html;
+    }
+
+    async function updateOrderStatus(orderId, username) {
+      const status = document.getElementById(`status-${orderId}`).value;
+      // Update order status
+      await fetch(API + `/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      // Send notification to user
+      await fetch(API + '/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: "order",
+          username,
+          action: status,
+          message: `Your order #${orderId} status has been updated to "${status}".`,
+          date: new Date().toLocaleString()
+        })
+      });
+      alert('Order status updated and user notified!');
+      loadOrders();
+    }
+
+    async function loadUsers() {
+      const res = await fetch(API + '/users');
+      const users = await res.json();
+      let html = `<h1>Users</h1>
+        <table>
+          <tr><th>Username</th><th>State</th><th>Area</th><th>Street</th></tr>`;
+      for (const u of users) {
+        html += `<tr>
+          <td>${u.username}</td>
+          <td>${u.state}</td>
+          <td>${u.area}</td>
+          <td>${u.street}</td>
+        </tr>`;
+      }
+      html += `</table>`;
+      document.getElementById('users-section').innerHTML = html;
+    }
+
+    async function loadNotifications() {
+      const res = await fetch(API + '/notifications');
+      const notifs = await res.json();
+      let html = `<h1>Notifications</h1><ul>`;
+      for (const n of notifs) {
+        html += `<li><b>${n.username || n.user || ''}:</b> ${n.message || JSON.stringify(n)} <span style="color:#888;font-size:0.95em;">${n.date || ''}</span></li>`;
+      }
+      html += `</ul>`;
+      document.getElementById('notifications-section').innerHTML = html;
+    }
+
+    // Add this function for deleting all users
+    async function deleteAllUsers() {
+      if (!confirm('Are you sure you want to delete ALL users? This cannot be undone!')) return;
+      const res = await fetch(API + '/users', { method: 'DELETE' });
+      const data = await res.json();
+      document.getElementById('delete-users-result').textContent = data.message || 'All users deleted.';
+      loadUsers();
+    }
+
+    showSection('dashboard');
+  </script>
+</body>
+</html>
