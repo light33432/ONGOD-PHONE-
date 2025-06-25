@@ -8,13 +8,23 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const fs = require('fs');
 
 const app = express();
-app.use(cors());
+
+// --- CORS: Allow local frontend and your Render backend domain ---
+const allowedOrigins = [
+  'http://localhost:3000', // local frontend (React, etc.)
+  'https://your-backend-name.onrender.com' // your Render backend domain
+  // Add your frontend production domain here if you deploy frontend elsewhere
+];
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
 app.use(bodyParser.json());
 
-// Serve static images from the "images" folder (absolute path for local backend)
+// Serve static images from the "images" folder
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
 const SECRET = process.env.SECRET || 'ongod_secret_key';
@@ -59,28 +69,6 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_PASS
-  }
-});
-
-// --- Test Nodemailer on Startup ---
-transporter.verify(function(error, success) {
-  if (error) {
-    console.error('Nodemailer connection error:', error);
-  } else {
-    console.log('Nodemailer is ready to send emails');
-    // --- Send a test email on startup ---
-    transporter.sendMail({
-      from: `"ONGOD Gadget" <${process.env.GMAIL_USER}>`,
-      to: process.env.GMAIL_USER,
-      subject: 'ONGOD Gadget Test Email',
-      text: 'This is a test email from your ONGOD Gadget backend.'
-    }, (err, info) => {
-      if (err) {
-        console.error('Test email error:', err);
-      } else {
-        console.log('Test email sent:', info.response);
-      }
-    });
   }
 });
 
@@ -202,17 +190,7 @@ app.post('/api/users/register', async (req, res) => {
       from: `"ONGOD Gadget" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: 'ONGOD Gadget Email Verification',
-      text: `Your verification code is: ${verificationCode}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:400px;margin:auto;">
-          <h2 style="color:#007bff;">ONGOD Gadget Verification</h2>
-          <p>Your verification code is:</p>
-          <div style="font-size:2em;font-weight:bold;letter-spacing:4px;background:#f2f2f2;padding:12px 0;text-align:center;border-radius:8px;margin:16px 0;">
-            ${verificationCode}
-          </div>
-          <p>Enter this code in the app to verify your email.</p>
-        </div>
-      `
+      text: `Your verification code is: ${verificationCode}`
     });
     res.json({ success: true, message: 'Verification code sent to your email.' });
   } catch (err) {
@@ -336,6 +314,15 @@ app.delete('/api/admin/clear-all', (req, res) => {
   res.json({ message: 'All users, orders, notifications, and customer care messages deleted.' });
 });
 
+// --- Start server ---
+// Listen on all interfaces for LAN/mobile access
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Backend running on http://0.0.0.0:${PORT} (accessible on your local network)`);
+  if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+    console.log('Public URL: https://' + process.env.RENDER_EXTERNAL_HOSTNAME);
+  }
+});
+
 // --- EXTRA: Utility endpoint to add a test user quickly (for development only) ---
 app.post('/api/dev-add-user', async (req, res) => {
   const { username, password, email } = req.body;
@@ -356,12 +343,3 @@ app.use((err, req, res, next) => {
   console.error('Server error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
-
-// --- Start server locally, export for Vercel ---
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Backend running on http://localhost:${PORT}`);
-  });
-}
-
-module.exports = app;
